@@ -2,6 +2,7 @@ package org.example
 
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.SQLException
 
 data class Alumno(
     val dni: Int,
@@ -22,8 +23,7 @@ data class Nota(
     val nota: Int
 )
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
+
 fun main() {
     val jdbcUrl = "jdbc:postgresql://localhost:5432/school"
     val connection = DriverManager.getConnection(jdbcUrl)
@@ -43,6 +43,8 @@ fun main() {
     ex3(connection)
     println()
     ex4(connection, listOfStudentsToAdd)
+    println()
+    ex5(connection, listOfStudentsToAdd)
 
 }
 
@@ -114,14 +116,47 @@ fun ex4(connection: Connection, studentsToAdd: MutableList<Alumno>) {
         val poblacion = student.poblacion
         val telef = student.telef
 
-        val insertQuery = "INSERT INTO alumnos (dni, apenom, direc, pobla, telef) VALUES ($dni, '$apenom', '$direc', '$poblacion', $telef)"
+        val insertQuery = "INSERT INTO alumnos (dni, apenom, direc, pobla, telef) VALUES ('$dni', '$apenom', '$direc', '$poblacion', '$telef')"
 
-        query.executeUpdate(insertQuery)
+        try {
+            query.executeUpdate(insertQuery)
+        } catch (exception: SQLException) {
+            if (exception.sqlState == "23505") { // SQLState para violación de restricción única (clave duplicada)
+                println("Error: El estudiante con DNI $dni ya existe en la base de datos.")
+            } else {
+                exception.printStackTrace()
+            }
+        }
     }
     println("Nueva lista de estudiantes: ")
-
     ex1(connection)
 }
+
+fun ex5(connection: Connection, students: MutableList<Alumno>) {
+    val insertQuery = "INSERT INTO notas (dni, cod, nota) VALUES (?, (SELECT cod FROM asignaturas WHERE nombre =   ?), ?)"
+
+    val preparedStatement = connection.prepareStatement(insertQuery)
+
+    students.forEach { student ->
+        try {
+            // INSERT de la nota para la asignatura FOL
+            preparedStatement.setInt(1, student.dni)
+            preparedStatement.setString(2, "FOL")
+            preparedStatement.setInt(3, 8)
+            preparedStatement.executeUpdate()
+
+            // INSERT de la nota para la asignatura RET
+            preparedStatement.setInt(1, student.dni)
+            preparedStatement.setString(2, "RET")
+            preparedStatement.setInt(3, 8)
+            preparedStatement.executeUpdate()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    ex2(connection)
+}
+
 
 
 
